@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Party? | 18+ Matching</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --neon: #ff007f; --cyan: #00f2ff; --bg: #050505; }
+        body { background: var(--bg); color: white; font-family: 'Helvetica Neue', Arial, sans-serif; margin: 0; overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #particles-js { position: absolute; width: 100%; height: 100%; top: 0; left: 0; z-index: -1; }
+        #app { width: 100%; max-width: 400px; height: 100%; position: relative; background: #111; border-left: 1px solid #222; border-right: 1px solid #222; overflow: hidden; box-shadow: 0 0 50px rgba(0, 242, 255, 0.2); }
+        .view { position: absolute; width: 100%; height: 100%; padding: 30px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; transition: 0.5s; }
+        .hidden { transform: translateY(100%); opacity: 0; pointer-events: none; }
+        .neon-title { font-size: 3.5rem; color: var(--neon); text-shadow: 0 0 15px var(--neon); margin: 0; font-style: italic; }
+        .btn { background: none; border: 2px solid white; color: white; padding: 12px 20px; border-radius: 30px; cursor: pointer; width: 85%; margin: 8px 0; font-weight: bold; transition: 0.3s; font-size: 0.9rem; position: relative; z-index: 10; outline: none; -webkit-tap-highlight-color: transparent; }
+        .btn:active { background: white; color: black; }
+        .btn.primary { border-color: var(--neon); color: var(--neon); box-shadow: 0 0 15px var(--neon); }
+        input, select { width: 85%; padding: 12px; margin: 8px 0; background: #222; border: 1px solid #444; color: white; border-radius: 10px; font-size: 1rem; }
+        .card { position: relative; width: 100%; height: 75%; background: #1a1a1a; border: 2px solid var(--neon); border-radius: 20px; display: flex; flex-direction: column; justify-content: space-around; padding: 20px; box-sizing: border-box; transition: 0.4s; z-index: 10; }
+        .swipe-left { transform: translateX(-150%) rotate(-20deg); opacity: 0; }
+        .swipe-right { transform: translateX(150%) rotate(20deg); opacity: 0; }
+        #result-display { border: 2px solid var(--cyan); padding: 15px; border-radius: 20px; width: 95%; background: rgba(0, 242, 255, 0.05); overflow-y: auto; max-height: 90%; }
+        .tag { display: inline-block; background: #333; padding: 5px 10px; border-radius: 5px; font-size: 0.75rem; margin: 3px; color: var(--cyan); }
+        #party-profile { position: absolute; top: 10%; left: 5%; width: 90%; height: 80%; background: #222; border: 2px solid var(--cyan); border-radius: 20px; z-index: 100; padding: 20px; box-sizing: border-box; display: none; }
+    </style>
+</head>
+<body>
+
+<audio id="se-click" src="https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3" preload="auto"></audio>
+<audio id="se-swipe" src="https://assets.mixkit.co/active_storage/sfx/1479/1479-preview.mp3" preload="auto"></audio>
+<audio id="se-finish" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3" preload="auto"></audio>
+
+<div id="particles-js"></div>
+
+<div id="app">
+    <div id="view-gate" class="view">
+        <h1 class="neon-title">Party?</h1>
+        <p style="font-size:1.1rem; margin-top:20px;">ARE YOU 18+?</p>
+        <button class="btn primary" onclick="unlockAndEnter()">YES, I'M ADULT</button>
+    </div>
+
+    <div id="view-profile" class="view hidden">
+        <h2 style="color: var(--cyan);">PROFILE</h2>
+        <div style="font-size: 2.2rem; margin-bottom: 15px; display:flex; gap:30px;">
+            <span id="gender-m" style="cursor:pointer" onclick="setGender('♂')">♂</span>
+            <span id="gender-f" style="cursor:pointer" onclick="setGender('♀')">♀</span>
+            <span id="gender-o" style="cursor:pointer" onclick="setGender('⚪︎')">⚪︎</span>
+        </div>
+        <select id="user-job" onchange="toggleJobFields()">
+            <option value="student">🎓 大学生・専門生</option>
+            <option value="worker">💼 社会人（会社員）</option>
+            <option value="freeter">🎸 フリーター・その他</option>
+        </select>
+        <input type="text" id="job-name" placeholder="大学名を入力">
+        <input type="number" id="user-income" placeholder="想定年収 (万円)" style="display:none;">
+        <button class="btn primary" style="margin-top:20px;" onclick="validateAndStart()">START PARTY</button>
+    </div>
+
+    <div id="view-quiz" class="view hidden">
+        <div id="card-container" style="width:100%; height:100%; display:flex; justify-content:center; align-items:center;"></div>
+    </div>
+
+    <div id="view-result" class="view hidden">
+        <div id="result-display">
+            <h3 style="margin:0; font-size:0.8rem; color:#888;">YOUR MATCH</h3>
+            <div id="res-logo" style="font-size:3.5rem; margin:5px 0;">🏛️</div>
+            <h1 id="res-party" style="margin:0; color:var(--cyan);">---</h1>
+            <h2 id="res-percent" style="color:var(--neon); margin:0;">Match! --%</h2>
+            <div id="res-tags"></div>
+            <canvas id="matchRadarChart" style="max-height: 150px; margin-top:10px;"></canvas>
+            <button class="btn" onclick="showPartyProfile()">VIEW PROFILE</button>
+            <button class="btn" style="border-color: #1DA1F2; color: #1DA1F2;" onclick="shareX()">Share on X</button>
+        </div>
+    </div>
+
+    <div id="party-profile">
+        <h2 id="prof-name" style="color:var(--cyan); margin-top:0;"></h2>
+        <p id="prof-catch" style="font-style:italic; color:var(--neon); font-size:0.9rem;"></p>
+        <hr border="0" style="border-top:1px solid #444;">
+        <ul id="prof-policy" style="text-align:left; font-size:0.85rem; padding-left:20px;"></ul>
+        <button class="btn" onclick="playClick(); document.getElementById('party-profile').style.display='none'">CLOSE</button>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+<script>
+    const seClick = document.getElementById('se-click');
+    const seSwipe = document.getElementById('se-swipe');
+    const seFinish = document.getElementById('se-finish');
+
+    function playClick() { seClick.currentTime = 0; seClick.play(); }
+    function playSwipe() { seSwipe.currentTime = 0; seSwipe.play(); }
+    function playFinish() { seFinish.currentTime = 0; seFinish.play(); }
+
+    function unlockAndEnter() {
+        // 音声をアンロック
+        playClick();
+        showView('view-profile');
+    }
+
+    let currentIdx = 0; let selectedGender = ''; let finalWinner = '';
+    const scores = { ldp:0, cdp:0, komei:0, ishin:0, dpfp:0, jcp:0, reiwa:0 };
+    const matchCategories = { economic: 0, social: 0, defense: 0, governance: 0 };
+
+    const questions = [
+        { q: "社会保険料、高齢者の負担を増やしてでも若者の分を減らすべき？", opt: [{t:"絶対減らすべき！", s:{dpfp:10, ishin:8}, cat:{economic:10}}, {t:"今は耐えるしかない", s:{cdp:10, komei:10}, cat:{economic:5}}, {t:"現金を配って！", s:{reiwa:10, jcp:8}, cat:{economic:10}}] },
+        { q: "大学の学費、どうなるのが一番助かる？", opt: [{t:"全員無料にして！", s:{cdp:10, jcp:10, reiwa:10}, cat:{social:10}}, {t:"必要な人をガッツリ支援", s:{ldp:10, komei:10}, cat:{economic:10}}, {t:"卒業後の手取りを増やして", s:{dpfp:10, ishin:8}, cat:{economic:10}}] },
+        { q: "防衛費（武器など）、もっと増やすべき？", opt: [{t:"最優先で強化して！", s:{ldp:10, ishin:10}, cat:{defense:10}}, {t:"バランスを考えて", s:{dpfp:10, komei:10}, cat:{defense:5}}, {t:"武器より外交が大事", s:{cdp:10, jcp:10, reiwa:10}, cat:{defense:10}}] },
+        { q: "結婚後の名字（夫婦別姓）、自由にしていい？", opt: [{t:"自由でいいじゃん！", s:{cdp:10, jcp:10, reiwa:10}, cat:{social:10}}, {t:"今のままでいい", s:{ldp:10}, cat:{social:5}}, {t:"旧姓の利便性を上げて", s:{dpfp:10, komei:10}, cat:{governance:10}}] },
+        { q: "消費税、ぶっちゃけどうしてほしい？", opt: [{t:"5%に下げるかゼロに！", s:{dpfp:10, reiwa:10, jcp:10}, cat:{economic:10}}, {t:"食料品だけゼロに", s:{cdp:10, komei:10}, cat:{economic:8}}, {t:"現状維持で福祉へ", s:{ldp:10}, cat:{economic:5}}] },
+        { q: "観光客が多すぎる問題。制限する？", opt: [{t:"二重価格や税で制限", s:{ishin:10, dpfp:8}, cat:{economic:8}}, {t:"デジタルで混雑緩和", s:{dpfp:10, komei:10}, cat:{governance:10}}, {t:"どんどん受け入れる", s:{ldp:10}, cat:{economic:10}}] },
+        { q: "外国人労働者、もっと受け入れるべき？", opt: [{t:"どんどん受け入れよう", s:{ldp:10, cdp:8}, cat:{social:10}}, {t:"審査して慎重に", s:{dpfp:10, komei:10}, cat:{social:10}}, {t:"まずは日本人の給料UP", s:{ishin:10, jcp:8}, cat:{economic:10}}] },
+        { q: "政治のスピード。もっと早く決めてほしい？", opt: [{t:"リーダーが即決すべき", s:{ishin:10, ldp:8}, cat:{governance:10}}, {t:"データを見て着実に", s:{dpfp:10, cdp:8}, cat:{governance:8}}, {t:"時間をかけて納得いくまで", s:{jcp:10}, cat:{governance:10}}] },
+        { q: "電気代安くするために原発どうする？", opt: [{t:"安全なら動かす", s:{ldp:10, ishin:10, dpfp:10}, cat:{economic:10}}, {t:"自然エネへ移行", s:{komei:10, cdp:10}, cat:{social:10}}, {t:"リスクがあるから停止", s:{reiwa:10, jcp:10}, cat:{social:10}}] },
+        { q: "今の憲法、変えるべき？", opt: [{t:"時代に合わせて変える", s:{ldp:10, ishin:10, dpfp:10}, cat:{governance:10}}, {t:"生活優先", s:{komei:10, cdp:10}, cat:{governance:5}}, {t:"絶対変えない", s:{jcp:10}, cat:{defense:10}}] }
+    ];
+
+    const partyDetails = {
+        dpfp: { name: "国民民主党", catch: "「手取りを増やす」ガチ勢", policy: ["103万の壁撤廃", "社会保険料の軽減", "ガソリン代値下げ"] },
+        ldp: { name: "自由民主党", catch: "安定と実績のブランド", policy: ["防衛力の強化", "経済成長の継続"] },
+        cdp: { name: "立憲民主党", catch: "暮らしの下支え", policy: ["消費税の還付", "選択的夫婦別姓"] },
+        ishin: { name: "日本維新の会", catch: "徹底した身を切る改革", policy: ["議員定数の削減", "教育の完全無償化"] },
+        komei: { name: "公明党", catch: "小さな声を、聴く力。", policy: ["子育て支援の充実", "軽減税率の維持"] },
+        jcp: { name: "日本共産党", catch: "大企業より、あなたの生活。", policy: ["学費の無償化", "労働時間の短縮"] },
+        reiwa: { name: "れいわ新選組", catch: "何があっても心配するな。", policy: ["消費税の廃止", "季節ごとの現金給付"] }
+    };
+
+    function showView(id) { document.querySelectorAll('.view').forEach(v => v.classList.add('hidden')); document.getElementById(id).classList.remove('hidden'); }
+    function setGender(g) { playClick(); selectedGender = g; ['gender-m','gender-f','gender-o'].forEach(id => document.getElementById(id).style.color = 'white'); document.getElementById('gender-'+(g==='♂'?'m':g==='♀'?'f':'o')).style.color = 'var(--neon)'; }
+    function toggleJobFields() { playClick(); const job = document.getElementById('user-job').value; document.getElementById('job-name').placeholder = job === 'student' ? '大学名' : '会社名/職種'; document.getElementById('user-income').style.display = job === 'student' ? 'none' : 'block'; }
+    
+    function validateAndStart() {
+        const job = document.getElementById('user-job').value;
+        const detail = document.getElementById('job-name').value;
+        const income = document.getElementById('user-income').value;
+        if(!selectedGender || !detail || (job !== 'student' && !income)) return alert("全部入力してね！");
+        playClick(); showView('view-quiz'); renderCard();
+    }
+
+    function renderCard() {
+        if(currentIdx >= questions.length) return showResult();
+        const container = document.getElementById('card-container');
+        container.innerHTML = '';
+        const q = questions[currentIdx];
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `<h4 style="color:var(--cyan);">STEP ${currentIdx+1}/10</h4><h2>${q.q}</h2>`;
+        q.opt.forEach((o, i) => {
+            const b = document.createElement('button'); b.className = 'btn'; b.innerText = o.t;
+            b.onclick = () => {
+                playSwipe(); // 強制再生
+                card.classList.add(i === 0 ? 'swipe-right' : 'swipe-left');
+                for(let p in o.s) scores[p] += o.s[p];
+                for(let c in o.cat) matchCategories[c] += o.cat[c];
+                currentIdx++;
+                setTimeout(renderCard, 400);
+            };
+            card.appendChild(b);
+        });
+        container.appendChild(card);
+    }
+
+    function showResult() {
+        playFinish();
+        showView('view-result');
+        finalWinner = Object.keys(scores).reduce((a, b) => scores[a] > scores[b] ? a : b);
+        document.getElementById('res-party').innerText = partyDetails[finalWinner].name;
+        document.getElementById('res-percent').innerText = `Match! ${88 + Math.floor(Math.random()*11)}%`;
+        const tags = [`#${selectedGender}`, `#${document.getElementById('job-name').value}`];
+        if(document.getElementById('user-income').value) tags.push(`#年収${document.getElementById('user-income').value}万`);
+        document.getElementById('res-tags').innerHTML = tags.map(t => `<span class="tag">${t}</span>`).join('');
+        new Chart(document.getElementById('matchRadarChart'), { type: 'radar', data: { labels: ['経済', '社会', '国防', '改革'], datasets: [{ data: [matchCategories.economic, matchCategories.social, matchCategories.defense, matchCategories.governance], backgroundColor: 'rgba(0, 242, 255, 0.2)', borderColor: 'var(--cyan)' }] }, options: { legend: {display: false}, scale: { ticks: { display: false, max: 25 } } } });
+    }
+
+    function showPartyProfile() {
+        playClick();
+        const p = partyDetails[finalWinner];
+        document.getElementById('prof-name').innerText = p.name;
+        document.getElementById('prof-catch').innerText = p.catch;
+        document.getElementById('prof-policy').innerHTML = p.policy.map(li => `<li>${li}</li>`).join('');
+        document.getElementById('party-profile').style.display = 'block';
+    }
+
+    function shareX() {
+        const text = `マッチングアプリ風政党診断「Party?」で【${partyDetails[finalWinner].name}】とマッチした！ #Party2026`;
+        window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`);
+    }
+
+    particlesJS("particles-js", { "particles": { "number": { "value": 40 }, "color": { "value": "#ff007f" }, "line_linked": { "enable": true, "color": "#ff007f" }, "move": { "enable": true, "speed": 3 } } });
+</script>
+</body>
+</html>
